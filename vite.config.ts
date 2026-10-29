@@ -10,7 +10,7 @@ export default defineConfig({
   server: {
     allowedHosts:["techaraujo.onrender.com"],
     host: '0.0.0.0',
-    port: 5173,
+    port: 10000,
     proxy: {
       '/techaraujo/backend': {
         target: 'http://localhost',
