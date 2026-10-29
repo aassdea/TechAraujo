@@ -25,7 +25,11 @@ export function App() {
   const [showTicketForm, setShowTicketForm] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    const guardado = localStorage.getItem("techrepair_dark");
+    if (guardado !== null) return guardado === "1";
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+  });
   const [tickets, setTickets] = useState<SolicitudTicket[]>([]);
   const [pcs, setPCs] = useState<PC[]>([]);
   const [users, setUsers] = useState<Usuario[]>([]);
@@ -34,6 +38,12 @@ export function App() {
   return usuarioGuardado ? JSON.parse(usuarioGuardado) : null;
 });
   const [authView, setAuthView] = useState<"login" | "register">("login");
+
+  // Aplica el modo oscuro a toda la página y lo recuerda entre sesiones.
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkMode);
+    localStorage.setItem("techrepair_dark", darkMode ? "1" : "0");
+  }, [darkMode]);
 
   const sincronizarDatos = useCallback(async () => {
     try {
@@ -189,6 +199,12 @@ export function App() {
   setCurrentUser(null);
   localStorage.removeItem("techrepair_user");
   setActiveView("pcs");
+  setSelectedPCId(null);
+  setSearchTerm("");
+  setShowAddModal(false);
+  setShowTicketForm(false);
+  setMobileSidebarOpen(false);
+  setAuthView("login");
 };
 
   const updateUserRole = (userId: string, newRole: RolUsuario) => {
@@ -588,7 +604,7 @@ export function App() {
 
           {activeView === "prices" && (currentUser.rol === "administrador" || currentUser.rol === "tecnico") && (
             <div className="flex-1 bg-card overflow-hidden">
-              <ComparadorPrecios />
+              <ComparadorPrecios usuarioId={currentUser.id} />
             </div>
           )}
 

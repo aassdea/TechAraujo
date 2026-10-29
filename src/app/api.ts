@@ -37,6 +37,16 @@ async function request<T>(resource: string, options: RequestInit = {}): Promise<
   return data as T;
 }
 
+export interface ResultadoPrecio {
+  nombre: string;
+  tienda: string;
+  precio: number | null;
+  precioTexto: string;
+  enlace: string;
+  imagen: string;
+  envio: string;
+}
+
 export const api = {
   health: () => request<{ok:boolean}>("health"),
   login: (email:string, contraseña:string) => request<Usuario>("login", {method:"POST", body:JSON.stringify({email, contraseña})}),
@@ -51,6 +61,7 @@ export const api = {
   crearPC: (pc:PC, clienteId?:string, ticketId?:string) => request<{id:string}>("pcs", {method:"POST", body:JSON.stringify({...pc, clienteId, ticketId})}),
   actualizarPC: (id:string, data:Partial<PC>) => request<{ok:boolean}>(`pcs&id=${id}`, {method:"PATCH", body:JSON.stringify(data)}),
   enviarOrdenPDF: (data:{equipoId:string; usuarioId:string; archivo:string; pdf:string}) => request<{ok:boolean; enviadoA:string}>("enviar-pdf", {method:"POST", body:JSON.stringify(data)}),
+  compararPrecios: (consulta:string, usuarioId:string) => request<{resultados:ResultadoPrecio[]; cache?:boolean}>(`comparar-precios&q=${encodeURIComponent(consulta)}&usuarioId=${encodeURIComponent(usuarioId)}`),
   mensajes: (chatId:string) => request<Mensaje[]>(`mensajes&chat_id=${chatId}`),
   crearMensaje: (data:Record<string,unknown>) => request<{id:string}>("mensajes", {method:"POST", body:JSON.stringify(data)}),
 };
