@@ -8,7 +8,7 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
-    allowedHost:["techaraujo.onrender.com"],
+    allowedHosts:["techaraujo.onrender.com"],
     host: '0.0.0.0',
     port: 5173,
     proxy: {
