@@ -59,6 +59,7 @@ export function Register({
         <div className="text-center mb-8">
           <h1 className="text-3xl mb-2">TechRepair</h1>
           <p className="text-sm text-muted-foreground">
+            Creá tu cuenta para solicitar y seguir tus reparaciones
           </p>
         </div>
 
@@ -67,9 +68,7 @@ export function Register({
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div> 
-              <label className="block text-xs text-muted-foreground mb-1.5">
-                
-              </label>
+              <label className="block text-xs text-muted-foreground mb-1.5">Nombre completo</label>
               <input
                 type="text"
                 required
@@ -86,9 +85,7 @@ export function Register({
             </div>
 
             <div> 
-              <label className="block text-xs text-muted-foreground mb-1.5">
-                
-              </label>
+              <label className="block text-xs text-muted-foreground mb-1.5">Correo electrónico</label>
               <input
                 type="email"
                 required
@@ -105,9 +102,7 @@ export function Register({
             </div>
 
             <div> 
-              <label className="block text-xs text-muted-foreground mb-1.5">
-                
-              </label>
+              <label className="block text-xs text-muted-foreground mb-1.5">Contraseña</label>
               <input
                 type="password"
                 required
@@ -124,9 +119,7 @@ export function Register({
             </div>
 
             <div> 
-              <label className="block text-xs text-muted-foreground mb-1.5">
-                
-              </label>
+              <label className="block text-xs text-muted-foreground mb-1.5">Confirmar contraseña</label>
               <input
                 type="password"
                 required
@@ -163,10 +156,11 @@ export function Register({
             <p className="text-xs text-muted-foreground">
               ¿Ya tienes cuenta?{" "}
               <button
+                type="button"
                 onClick={onSwitchToLogin}
                 className="text-foreground hover:underline"
               >
-                
+                Inicia sesión aquí
               </button>
             </p>
           </div>
