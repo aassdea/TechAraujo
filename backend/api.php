@@ -246,6 +246,93 @@ try {
     out(['ok'=>true,'enviadoA'=>$emailCliente]);
   }
 
+  // Comparador de precios: busca en Google Shopping a través de SerpApi.
+  // La clave (SERPAPI_KEY) vive solo en el servidor; el navegador nunca la ve.
+  if ($resource==='comparar-precios' && $method==='GET') {
+    $usuarioId=(int)($_GET['usuarioId']??0);
+    $consulta=trim((string)($_GET['q']??''));
+    if ($consulta==='' || mb_strlen($consulta)>100) out(['error'=>'Escribí qué querés buscar (máximo 100 caracteres)'],422);
+
+    // Cada búsqueda consume cupo del plan, así que solo técnicos y administradores.
+    $st=$pdo->prepare('SELECT rol FROM usuario WHERE id=? LIMIT 1');
+    $st->execute([$usuarioId]);
+    $rolBusca=$st->fetchColumn();
+    if ($rolBusca===false || (int)$rolBusca<1) out(['error'=>'No tenés permiso para usar el comparador'],403);
+
+    $claveSerp=configValue('SERPAPI_KEY');
+    if ($claveSerp==='') out(['error'=>'Falta configurar SERPAPI_KEY en el archivo .env'],503);
+
+    // Caché de 1 hora por búsqueda: repetir la misma consulta no gasta cupo.
+    $archivoCache=sys_get_temp_dir().DIRECTORY_SEPARATOR.'techaraujo_shop_'.md5(mb_strtolower($consulta)).'.json';
+    if (is_file($archivoCache) && (time()-(int)filemtime($archivoCache))<3600) {
+      $guardado=json_decode((string)file_get_contents($archivoCache), true);
+      if (is_array($guardado)) out(['resultados'=>$guardado,'cache'=>true]);
+    }
+
+    if (!function_exists('curl_init')) out(['error'=>'Falta activar la extensión curl en php.ini (extension=curl)'],503);
+
+    $urlSerp='https://serpapi.com/search.json?'.http_build_query([
+      'engine'=>'google_shopping',
+      'q'=>$consulta,
+      'gl'=>configValue('SHOPPING_GL','ar'),
+      'hl'=>'es',
+      'api_key'=>$claveSerp,
+    ]);
+
+    $ch=curl_init($urlSerp);
+    curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_CONNECTTIMEOUT=>8,CURLOPT_TIMEOUT=>30]);
+    $cacert=configValue('CURL_CA_BUNDLE');
+    if ($cacert!=='' && is_file($cacert)) curl_setopt($ch,CURLOPT_CAINFO,$cacert);
+    $respuesta=curl_exec($ch);
+    $codigoHttp=(int)curl_getinfo($ch,CURLINFO_HTTP_CODE);
+    $errorCurl=curl_error($ch);
+    curl_close($ch);
+
+    if ($respuesta===false) {
+      error_log('SerpApi: error de conexión: '.$errorCurl);
+      $pista=stripos($errorCurl,'SSL certificate')!==false ? ' (problema de certificados SSL: definí CURL_CA_BUNDLE en el .env)' : '';
+      out(['error'=>'No se pudo conectar con el servicio de precios'.$pista],502);
+    }
+
+    $datos=json_decode((string)$respuesta, true);
+    if (!is_array($datos)) { error_log('SerpApi: respuesta inválida (HTTP '.$codigoHttp.')'); out(['error'=>'El servicio de precios respondió algo inesperado'],502); }
+
+    $resultados=[];
+    if (isset($datos['shopping_results']) && is_array($datos['shopping_results'])) {
+      foreach (array_slice($datos['shopping_results'],0,24) as $p) {
+        $enlace=(string)($p['product_link']??$p['link']??'');
+        if (!preg_match('#^https?://#i',$enlace)) $enlace='';
+        $imagen=(string)($p['thumbnail']??'');
+        if (!preg_match('#^https://#i',$imagen)) $imagen='';
+        $resultados[]=[
+          'nombre'=>(string)($p['title']??''),
+          'tienda'=>(string)($p['source']??''),
+          'precio'=>isset($p['extracted_price']) ? (float)$p['extracted_price'] : null,
+          'precioTexto'=>(string)($p['price']??''),
+          'enlace'=>$enlace,
+          'imagen'=>$imagen,
+          'envio'=>(string)($p['delivery']??''),
+        ];
+      }
+    } elseif (!empty($datos['error']) && stripos((string)$datos['error'],'any results')===false) {
+      // Sin cupo, clave inválida, etc.: se registra el motivo real y al usuario se le da un mensaje claro.
+      error_log('SerpApi: '.(string)$datos['error']);
+      $mensaje=stripos((string)$datos['error'],'api_key')!==false ? 'La clave SERPAPI_KEY no es válida' : 'El servicio de precios devolvió un error (revisá el cupo mensual de tu plan)';
+      out(['error'=>$mensaje],502);
+    }
+
+    // De más barato a más caro; los que no tienen precio van al final.
+    usort($resultados, function($a,$b){
+      if ($a['precio']===null && $b['precio']===null) return 0;
+      if ($a['precio']===null) return 1;
+      if ($b['precio']===null) return -1;
+      return $a['precio'] <=> $b['precio'];
+    });
+
+    @file_put_contents($archivoCache, json_encode($resultados, JSON_UNESCAPED_UNICODE));
+    out(['resultados'=>$resultados,'cache'=>false]);
+  }
+
   out(['error'=>'Recurso no encontrado'],404);
 } catch(Throwable $e) { if($pdo->inTransaction())$pdo->rollBack(); error_log('Error interno de API: '.$e->getMessage()); out(['error'=>'Error interno'],500); }
 ?>
