@@ -18,6 +18,10 @@ RUN composer install --no-dev --no-interaction --optimize-autoloader
 # La API queda en /backend/api.php
 COPY backend ./backend
 
+# Página de inicio mínima: sirve para la comprobación de salud de Render
+# y para ver que el servicio está vivo al abrir la dirección raíz.
+RUN printf '%s' '<?php header("Content-Type: application/json"); echo json_encode(["ok" => true, "servicio" => "techaraujo-api"]);' > /var/www/html/index.php
+
 # Render indica el puerto en la variable PORT
 ENV PORT=10000
 RUN sed -i 's/Listen 80/Listen ${PORT}/' /etc/apache2/ports.conf \
