@@ -27,8 +27,9 @@ export function Login({ alIniciarSesion, cambiarARegistro, listaUsuarios, alInic
       const usuarioEncontrado = listaUsuarios.find((usuario) => usuario.email === correo && usuario.contraseña === contrasena);
       if (usuarioEncontrado) alIniciarSesion(usuarioEncontrado);
       else setMensajeError("Email o contraseña incorrectos");
-    } catch {
-      setMensajeError("Email o contraseña incorrectos");
+    } catch (error) {
+      // Muestra el motivo real (contraseña incorrecta, servidor caído, base sin conexión...)
+      setMensajeError(error instanceof Error ? error.message : "No se pudo iniciar sesión");
     }
   };
 

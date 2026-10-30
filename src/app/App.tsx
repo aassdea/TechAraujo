@@ -191,8 +191,10 @@ export function App() {
   };
 
   const handleRegister = async (user: Usuario) => {
-    try { const saved = await api.crearUsuario(user); setUsers(prev => [...prev, saved]); setCurrentUser(saved); }
-    catch (e) { console.error(e); }
+    // Si falla, el error llega a la pantalla de registro para mostrarlo.
+    const saved = await api.crearUsuario(user);
+    setUsers(prev => [...prev, saved]);
+    setCurrentUser(saved);
   };
 
  const handleLogout = () => {

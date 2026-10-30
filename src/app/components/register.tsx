@@ -3,7 +3,7 @@ import { UserPlus } from "lucide-react";
 import type { Usuario } from "../types";
 
 interface RegisterProps {
-  onRegister: (user: Usuario) => void;
+  onRegister: (user: Usuario) => void | Promise<void>;
   onSwitchToLogin: () => void;
   users: Usuario[];
 }
@@ -22,7 +22,7 @@ export function Register({
 
   const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -50,7 +50,11 @@ export function Register({
       fechaCreacion: new Date().toISOString()
     };
 
-    onRegister(nuevoUsuario);
+    try {
+      await onRegister(nuevoUsuario);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo crear la cuenta");
+    }
   };
 
   return (
