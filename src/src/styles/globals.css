@@ -1,0 +1,19 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+/* La app usa "size-full": sin esto la página crece más que la ventana y el
+   pie del menú (modo oscuro / cerrar sesión) queda fuera de pantalla. */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+.dark {
+  color-scheme: dark; /* scrollbars e inputs nativos también en oscuro */
+}
