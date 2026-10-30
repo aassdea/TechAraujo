@@ -130,7 +130,7 @@ export function PCDetails({
   if (showChat && canAccessChat) {
     return (
       <div className="w-full md:w-[400px] md:flex-shrink-0 h-full border-l border-border flex flex-col bg-card">
-        <div className="flex items-center justify-between p-4 border-b border-border">
+        <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
           <h2 className="font-medium text-card-foreground">
             Chat - {pc.id}
           </h2>
@@ -152,12 +152,14 @@ export function PCDetails({
           </div>
         </div>
 
-        <Chat
-          mensajes={pc.mensajes}
-          currentUser={currentUser}
-          onSendMessage={handleSendMessage}
-          otherUserName={pc.cliente}
-        />
+        <div className="flex-1 min-h-0">
+          <Chat
+            mensajes={pc.mensajes}
+            currentUser={currentUser}
+            onSendMessage={handleSendMessage}
+            otherUserName={pc.cliente}
+          />
+        </div>
       </div>
     );
   }

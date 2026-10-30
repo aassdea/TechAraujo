@@ -18,7 +18,17 @@ const tieneLosMismosDatos = <T,>(actual: T, siguiente: T) =>
 
 export function App() {
   /* MARKER-MAKE-KIT-INVOKED */
-  const [activeView, setActiveView] = useState<"pcs" | "prices" | "queries" | "tickets" | "users">("pcs");
+  // Vista inicial: los clientes y el celular arrancan en Tickets (la vista de PCs no es para clientes).
+  const vistaInicial = (rol?: string) =>
+    rol === "cliente" || window.matchMedia("(max-width: 767px)").matches ? "tickets" : "pcs";
+  const [activeView, setActiveView] = useState<"pcs" | "prices" | "queries" | "tickets" | "users">(() => {
+    try {
+      const guardado = JSON.parse(localStorage.getItem("techrepair_user") || "null");
+      return vistaInicial(guardado?.rol);
+    } catch {
+      return vistaInicial();
+    }
+  });
   const [selectedPCId, setSelectedPCId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -28,7 +38,7 @@ export function App() {
   const [darkMode, setDarkMode] = useState(() => {
     const guardado = localStorage.getItem("techrepair_dark");
     if (guardado !== null) return guardado === "1";
-    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+    return false; // claro por defecto; se recuerda lo que elijas
   });
   const [tickets, setTickets] = useState<SolicitudTicket[]>([]);
   const [pcs, setPCs] = useState<PC[]>([]);
@@ -38,6 +48,12 @@ export function App() {
   return usuarioGuardado ? JSON.parse(usuarioGuardado) : null;
 });
   const [authView, setAuthView] = useState<"login" | "register">("login");
+
+  // Al iniciar sesión, mostrar la vista que corresponde al rol (y al celular).
+  useEffect(() => {
+    if (currentUser) setActiveView(vistaInicial(currentUser.rol));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]);
 
   // Aplica el modo oscuro a toda la página y lo recuerda entre sesiones.
   useEffect(() => {
@@ -200,7 +216,7 @@ export function App() {
  const handleLogout = () => {
   setCurrentUser(null);
   localStorage.removeItem("techrepair_user");
-  setActiveView("pcs");
+  setActiveView(vistaInicial());
   setSelectedPCId(null);
   setSearchTerm("");
   setShowAddModal(false);
@@ -486,7 +502,7 @@ export function App() {
                       <p className="text-xs text-muted-foreground truncate">{selectedPC.marca} {selectedPC.modelo}</p>
                     </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto">
+                  <div className="flex-1 min-h-0 overflow-hidden">
                     <PCDetails
                       pc={selectedPC}
                       onClose={() => setSelectedPCId(null)}

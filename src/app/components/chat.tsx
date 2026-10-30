@@ -16,12 +16,13 @@ export function Chat({
   otherUserName,
 }: ChatProps) {
   const [newMessage, setNewMessage] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const listaRef = useRef<HTMLDivElement>(null);
 
+  // Baja solo la lista de mensajes. scrollIntoView() movía también los contenedores
+  // de la página y dejaba fuera de pantalla el botón de volver y los mensajes antiguos.
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: "smooth",
-    });
+    const lista = listaRef.current;
+    if (lista) lista.scrollTop = lista.scrollHeight;
   };
 
   useEffect(() => {
@@ -40,8 +41,8 @@ export function Chat({
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-3 border-b border-border">
+    <div className="flex flex-col h-full min-h-0">
+      <div className="p-3 border-b border-border flex-shrink-0">
         <h3 className="text-sm font-medium text-foreground">
           Chat{" "}
           {otherUserName &&
@@ -49,7 +50,7 @@ export function Chat({
         </h3>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div ref={listaRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
         {mensajes.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground text-xs">
             No hay mensajes aún. Inicia la
@@ -115,12 +116,11 @@ export function Chat({
           })
         )}
 
-        <div ref={messagesEndRef} />
       </div>
 
       <form
         onSubmit={handleSubmit}
-        className="p-3 border-t border-border"
+        className="p-3 border-t border-border flex-shrink-0"
       >
         <div className="flex gap-2">
           <input

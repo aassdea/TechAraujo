@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Plus } from "lucide-react";
 
 interface AddItemModalProps {
@@ -55,8 +56,8 @@ export function AddItemModal({
     onSubmit(nombre.trim(), precioLimpio);
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+  return createPortal(
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-2">
       <div className="bg-card w-full max-w-md mx-4 rounded-lg border border-border">
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="font-medium text-foreground">{titulo}</h2>
@@ -119,6 +120,7 @@ export function AddItemModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
