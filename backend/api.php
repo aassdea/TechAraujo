@@ -218,6 +218,47 @@ try {
     $marca=sys_get_temp_dir().DIRECTORY_SEPARATOR.'techaraujo_pdf_'.$equipoId.'.lock';
     if (is_file($marca) && (time()-(int)filemtime($marca))<30) out(['error'=>'Esta orden ya se envió hace instantes. Esperá unos segundos.'],429);
 
+    // Opción para la nube (Render y similares): envío por API web de Brevo (HTTPS, puerto 443).
+    // Render bloquea los puertos SMTP en el plan gratis, así que SMTP no funciona ahí.
+    $claveBrevo=configValue('BREVO_API_KEY');
+    if ($claveBrevo!=='') {
+      $remitente=configValue('MAIL_FROM', configValue('SMTP_FROM'));
+      if (!filter_var($remitente, FILTER_VALIDATE_EMAIL)) out(['error'=>'Falta configurar MAIL_FROM (el correo remitente verificado en Brevo)'],503);
+      if (!function_exists('curl_init')) out(['error'=>'Falta activar la extensión curl en PHP'],503);
+
+      $saludoBrevo=$nombreCliente!==''?'Hola '.htmlspecialchars($nombreCliente,ENT_QUOTES,'UTF-8').',':'Hola,';
+      $cargaBrevo=json_encode([
+        'sender'=>['name'=>configValue('SMTP_FROM_NAME','TechRepair'),'email'=>$remitente],
+        'to'=>[['email'=>$emailCliente,'name'=>$nombreCliente!==''?$nombreCliente:$emailCliente]],
+        'subject'=>'Tu orden de reparación N° '.$equipoId,
+        'htmlContent'=>'<p>'.$saludoBrevo.'</p><p>Te enviamos adjunta la orden de reparación N° '.$equipoId.' en formato PDF.</p><p>Ante cualquier duda, respondé este mail o comunicate con nosotros.</p><p>Saludos,<br>TechRepair</p>',
+        'textContent'=>($nombreCliente!==''?'Hola '.$nombreCliente.',':'Hola,')."\n\nTe enviamos adjunta la orden de reparación N° ".$equipoId." en formato PDF.\n\nSaludos,\nTechRepair",
+        'attachment'=>[['name'=>$nombreArchivo,'content'=>base64_encode($pdfBinario)]],
+      ], JSON_UNESCAPED_UNICODE);
+
+      $ch=curl_init('https://api.brevo.com/v3/smtp/email');
+      curl_setopt_array($ch,[
+        CURLOPT_POST=>true,
+        CURLOPT_POSTFIELDS=>$cargaBrevo,
+        CURLOPT_RETURNTRANSFER=>true,
+        CURLOPT_CONNECTTIMEOUT=>8,
+        CURLOPT_TIMEOUT=>30,
+        CURLOPT_HTTPHEADER=>['accept: application/json','content-type: application/json','api-key: '.$claveBrevo],
+      ]);
+      $respBrevo=curl_exec($ch);
+      $httpBrevo=(int)curl_getinfo($ch,CURLINFO_HTTP_CODE);
+      $errBrevo=curl_error($ch);
+      curl_close($ch);
+
+      if ($respBrevo===false || $httpBrevo<200 || $httpBrevo>=300) {
+        error_log('Brevo: HTTP '.$httpBrevo.' '.$errBrevo.' '.substr((string)$respBrevo,0,300));
+        out(['error'=>'No se pudo enviar el mail. Revisá BREVO_API_KEY y que MAIL_FROM sea un remitente verificado en Brevo.'],502);
+      }
+
+      @touch($marca);
+      out(['ok'=>true,'enviadoA'=>$emailCliente]);
+    }
+
     $autoload=dirname(__DIR__).'/vendor/autoload.php';
     if (!is_file($autoload)) out(['error'=>'Falta la carpeta vendor. Ejecutá: composer require phpmailer/phpmailer'],503);
     require_once $autoload;
