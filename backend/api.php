@@ -28,16 +28,26 @@ function configValue(string $key, string $default=''): string {
 }
 
 $host = configValue('TECH_DB_HOST', '127.0.0.1');
+$port = configValue('TECH_DB_PORT', '3306');
 $db   = configValue('TECH_DB_NAME', 'techaraujo');
 $user = configValue('TECH_DB_USER', 'root');
 $pass = configValue('TECH_DB_PASS');
 $googleClientId = configValue('GOOGLE_CLIENT_ID', configValue('VITE_GOOGLE_CLIENT_ID'));
 
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8mb4", $user, $pass, [
+    $opcionesPdo = [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    ]);
+    ];
+    // Bases en la nube (Aiven, TiDB Cloud, etc.) exigen conexión segura (SSL).
+    // TECH_DB_SSL_CA = ruta al certificado (absoluta, o relativa a la carpeta del proyecto).
+    $caSsl = configValue('TECH_DB_SSL_CA');
+    if ($caSsl !== '') {
+        $rutaCa = is_file($caSsl) ? $caSsl : dirname(__DIR__).'/'.ltrim($caSsl, '/\\');
+        if (is_file($rutaCa)) $opcionesPdo[PDO::MYSQL_ATTR_SSL_CA] = $rutaCa;
+        else error_log('TECH_DB_SSL_CA apunta a un archivo que no existe: '.$caSsl);
+    }
+    $pdo = new PDO("mysql:host=$host;port=$port;dbname=$db;charset=utf8mb4", $user, $pass, $opcionesPdo);
 } catch (Throwable $e) {
     error_log('Error de conexión a MySQL: '.$e->getMessage());
     http_response_code(500); echo json_encode(['error'=>'No se pudo conectar a MySQL']); exit;
