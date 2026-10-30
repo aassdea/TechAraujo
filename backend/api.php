@@ -218,41 +218,65 @@ try {
     $marca=sys_get_temp_dir().DIRECTORY_SEPARATOR.'techaraujo_pdf_'.$equipoId.'.lock';
     if (is_file($marca) && (time()-(int)filemtime($marca))<30) out(['error'=>'Esta orden ya se envió hace instantes. Esperá unos segundos.'],429);
 
-    // Opción para la nube (Render y similares): envío por API web de Brevo (HTTPS, puerto 443).
+    // Opciones para la nube (Render y similares): envío por API web (HTTPS, puerto 443).
     // Render bloquea los puertos SMTP en el plan gratis, así que SMTP no funciona ahí.
+    // Si hay claves de Brevo o de Mailjet configuradas, se usa una de ellas en lugar de SMTP.
     $claveBrevo=configValue('BREVO_API_KEY');
-    if ($claveBrevo!=='') {
+    $claveMailjet=configValue('MAILJET_API_KEY');
+    $secretoMailjet=configValue('MAILJET_SECRET_KEY');
+
+    if ($claveBrevo!=='' || ($claveMailjet!=='' && $secretoMailjet!=='')) {
       $remitente=configValue('MAIL_FROM', configValue('SMTP_FROM'));
-      if (!filter_var($remitente, FILTER_VALIDATE_EMAIL)) out(['error'=>'Falta configurar MAIL_FROM (el correo remitente verificado en Brevo)'],503);
+      if (!filter_var($remitente, FILTER_VALIDATE_EMAIL)) out(['error'=>'Falta configurar MAIL_FROM (el correo remitente verificado en tu servicio de mail)'],503);
       if (!function_exists('curl_init')) out(['error'=>'Falta activar la extensión curl en PHP'],503);
 
-      $saludoBrevo=$nombreCliente!==''?'Hola '.htmlspecialchars($nombreCliente,ENT_QUOTES,'UTF-8').',':'Hola,';
-      $cargaBrevo=json_encode([
-        'sender'=>['name'=>configValue('SMTP_FROM_NAME','TechRepair'),'email'=>$remitente],
-        'to'=>[['email'=>$emailCliente,'name'=>$nombreCliente!==''?$nombreCliente:$emailCliente]],
-        'subject'=>'Tu orden de reparación N° '.$equipoId,
-        'htmlContent'=>'<p>'.$saludoBrevo.'</p><p>Te enviamos adjunta la orden de reparación N° '.$equipoId.' en formato PDF.</p><p>Ante cualquier duda, respondé este mail o comunicate con nosotros.</p><p>Saludos,<br>TechRepair</p>',
-        'textContent'=>($nombreCliente!==''?'Hola '.$nombreCliente.',':'Hola,')."\n\nTe enviamos adjunta la orden de reparación N° ".$equipoId." en formato PDF.\n\nSaludos,\nTechRepair",
-        'attachment'=>[['name'=>$nombreArchivo,'content'=>base64_encode($pdfBinario)]],
-      ], JSON_UNESCAPED_UNICODE);
+      $nombreRemitente=configValue('SMTP_FROM_NAME','TechRepair');
+      $asuntoMail='Tu orden de reparación N° '.$equipoId;
+      $saludoHtml=$nombreCliente!==''?'Hola '.htmlspecialchars($nombreCliente,ENT_QUOTES,'UTF-8').',':'Hola,';
+      $htmlMail='<p>'.$saludoHtml.'</p><p>Te enviamos adjunta la orden de reparación N° '.$equipoId.' en formato PDF.</p><p>Ante cualquier duda, respondé este mail o comunicate con nosotros.</p><p>Saludos,<br>TechRepair</p>';
+      $textoMail=($nombreCliente!==''?'Hola '.$nombreCliente.',':'Hola,')."\n\nTe enviamos adjunta la orden de reparación N° ".$equipoId." en formato PDF.\n\nSaludos,\nTechRepair";
+      $nombreDestino=$nombreCliente!==''?$nombreCliente:$emailCliente;
 
-      $ch=curl_init('https://api.brevo.com/v3/smtp/email');
-      curl_setopt_array($ch,[
-        CURLOPT_POST=>true,
-        CURLOPT_POSTFIELDS=>$cargaBrevo,
-        CURLOPT_RETURNTRANSFER=>true,
-        CURLOPT_CONNECTTIMEOUT=>8,
-        CURLOPT_TIMEOUT=>30,
-        CURLOPT_HTTPHEADER=>['accept: application/json','content-type: application/json','api-key: '.$claveBrevo],
-      ]);
-      $respBrevo=curl_exec($ch);
-      $httpBrevo=(int)curl_getinfo($ch,CURLINFO_HTTP_CODE);
-      $errBrevo=curl_error($ch);
+      $ch=curl_init();
+      curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_RETURNTRANSFER=>true,CURLOPT_CONNECTTIMEOUT=>8,CURLOPT_TIMEOUT=>30]);
+
+      if ($claveBrevo!=='') {
+        $proveedor='Brevo';
+        curl_setopt($ch,CURLOPT_URL,'https://api.brevo.com/v3/smtp/email');
+        curl_setopt($ch,CURLOPT_HTTPHEADER,['accept: application/json','content-type: application/json','api-key: '.$claveBrevo]);
+        curl_setopt($ch,CURLOPT_POSTFIELDS,json_encode([
+          'sender'=>['name'=>$nombreRemitente,'email'=>$remitente],
+          'to'=>[['email'=>$emailCliente,'name'=>$nombreDestino]],
+          'subject'=>$asuntoMail,
+          'htmlContent'=>$htmlMail,
+          'textContent'=>$textoMail,
+          'attachment'=>[['name'=>$nombreArchivo,'content'=>base64_encode($pdfBinario)]],
+        ], JSON_UNESCAPED_UNICODE));
+      } else {
+        $proveedor='Mailjet';
+        curl_setopt($ch,CURLOPT_URL,'https://api.mailjet.com/v3.1/send');
+        curl_setopt($ch,CURLOPT_HTTPHEADER,['content-type: application/json']);
+        curl_setopt($ch,CURLOPT_USERPWD,$claveMailjet.':'.$secretoMailjet);
+        curl_setopt($ch,CURLOPT_POSTFIELDS,json_encode([
+          'Messages'=>[[
+            'From'=>['Email'=>$remitente,'Name'=>$nombreRemitente],
+            'To'=>[['Email'=>$emailCliente,'Name'=>$nombreDestino]],
+            'Subject'=>$asuntoMail,
+            'TextPart'=>$textoMail,
+            'HTMLPart'=>$htmlMail,
+            'Attachments'=>[['ContentType'=>'application/pdf','Filename'=>$nombreArchivo,'Base64Content'=>base64_encode($pdfBinario)]],
+          ]],
+        ], JSON_UNESCAPED_UNICODE));
+      }
+
+      $respMail=curl_exec($ch);
+      $httpMail=(int)curl_getinfo($ch,CURLINFO_HTTP_CODE);
+      $errMail=curl_error($ch);
       curl_close($ch);
 
-      if ($respBrevo===false || $httpBrevo<200 || $httpBrevo>=300) {
-        error_log('Brevo: HTTP '.$httpBrevo.' '.$errBrevo.' '.substr((string)$respBrevo,0,300));
-        out(['error'=>'No se pudo enviar el mail. Revisá BREVO_API_KEY y que MAIL_FROM sea un remitente verificado en Brevo.'],502);
+      if ($respMail===false || $httpMail<200 || $httpMail>=300) {
+        error_log($proveedor.': HTTP '.$httpMail.' '.$errMail.' '.substr((string)$respMail,0,300));
+        out(['error'=>'No se pudo enviar el mail con '.$proveedor.'. Revisá las claves y que MAIL_FROM sea un remitente verificado.'],502);
       }
 
       @touch($marca);
