@@ -21,6 +21,7 @@ export function Register({
   });
 
   const [error, setError] = useState("");
+  const [enviando, setEnviando] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +37,9 @@ export function Register({
       return;
     }
 
-    if (users.find((u) => u.email === formData.email)) {
+    if (enviando) return; // evita crear la cuenta dos veces con un doble clic
+
+    if (users.find((u) => u.email.trim().toLowerCase() === formData.email.trim().toLowerCase())) {
       setError("Este email ya está registrado");
       return;
     }
@@ -50,10 +53,13 @@ export function Register({
       fechaCreacion: new Date().toISOString()
     };
 
+    setEnviando(true);
     try {
       await onRegister(nuevoUsuario);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear la cuenta");
+    } finally {
+      setEnviando(false);
     }
   };
 
@@ -149,10 +155,11 @@ export function Register({
 
             <button
               type="submit"
-              className="w-full px-4 py-2.5 text-sm bg-foreground text-background rounded-md hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+              disabled={enviando}
+              className="w-full px-4 py-2.5 text-sm bg-foreground text-background rounded-md hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <UserPlus className="w-4 h-4" />
-              Registrarse
+              {enviando ? "Creando cuenta..." : "Registrarse"}
             </button>
           </form>
 

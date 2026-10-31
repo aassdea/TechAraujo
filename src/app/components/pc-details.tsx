@@ -331,8 +331,7 @@ export function PCDetails({
               value={pc.tecnicoAsignadoId || ""}
               onChange={(e) =>
                 onUpdate({
-                  tecnicoAsignadoId:
-                    e.target.value || undefined,
+                  tecnicoAsignadoId: e.target.value,
                 })
               }
               className="w-full px-3 py-2 bg-muted border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring text-sm text-foreground"
