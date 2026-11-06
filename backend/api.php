@@ -179,9 +179,7 @@ try {
   if ($resource==='mensajes' && $method==='POST') { $d=body(); $chat=(int)($d['chatId']??0); if(!$chat && !empty($d['equipoId'])){ $st=$pdo->prepare('SELECT c.id FROM chat c JOIN trabajo tr ON tr.id=c.trabajo_id WHERE tr.equipo_id=? LIMIT 1');$st->execute([(int)$d['equipoId']]);$chat=(int)$st->fetchColumn(); } if(!$chat && !empty($d['trabajoId'])){$st=$pdo->prepare('SELECT id FROM chat WHERE trabajo_id=? LIMIT 1');$st->execute([(int)$d['trabajoId']]);$chat=(int)$st->fetchColumn();} if(!$chat) out(['error'=>'chatId/trabajoId obligatorio'],422);$st=$pdo->prepare('INSERT INTO mensaje(mensaje,fecha,usuario_id,chat_id) VALUES(?,NOW(),?,?)');$st->execute([$d['texto']??$d['mensaje']??'',(int)($d['usuarioId']??0),$chat]);out(['id'=>(string)$pdo->lastInsertId(),'ok'=>true],201); }
   if ($resource==='mensajes' && $method==='GET') { $chat=(int)($_GET['chat_id']??0);$st=$pdo->prepare('SELECT m.*, CONCAT_WS(\' \',u.nombre,u.apellido) nombre,u.rol FROM mensaje m LEFT JOIN usuario u ON u.id=m.usuario_id WHERE m.chat_id=? ORDER BY m.fecha');$st->execute([$chat]);$roles=[0=>'cliente',1=>'tecnico',2=>'administrador'];$out=[];foreach($st as $r)$out[]=['id'=>(string)$r['id'],'idRemitente'=>(string)$r['usuario_id'],'nombreRemitente'=>$r['nombre']??'','rolRemitente'=>$roles[(int)$r['rol']]??'cliente','texto'=>$r['mensaje']??'','fechaHora'=>$r['fecha']??''];out($out);}
 
-  // Envía por mail al cliente el PDF de la orden de reparación.
-  // El destinatario sale SIEMPRE de la base de datos (mail con el que el cliente
-  // inició sesión / generó el ticket); el navegador nunca lo elige.
+  
   if ($resource==='enviar-pdf' && $method==='POST') {
     $d=body();
     $equipoId=(int)($d['equipoId']??0);
@@ -189,13 +187,12 @@ try {
     $pdfBase64=(string)($d['pdf']??'');
     if (!$equipoId || !$usuarioId || $pdfBase64==='') out(['error'=>'Faltan datos para enviar el PDF'],422);
 
-    // Solo técnicos (1) y administradores (2) pueden enviar órdenes por mail.
+  
     $st=$pdo->prepare('SELECT rol FROM usuario WHERE id=? LIMIT 1');
     $st->execute([$usuarioId]);
     $rolEmisor=$st->fetchColumn();
     if ($rolEmisor===false || (int)$rolEmisor<1) out(['error'=>'No tenés permiso para enviar órdenes por mail'],403);
 
-    // Mail y nombre del cliente dueño del ticket de este equipo.
     $st=$pdo->prepare('SELECT u.email, CONCAT_WS(\' \',u.nombre,u.apellido) nombre FROM equipo e JOIN ticket t ON t.id=e.ticket_id JOIN usuario u ON u.id=t.cliente_id WHERE e.id=? LIMIT 1');
     $st->execute([$equipoId]);
     $cliente=$st->fetch();
@@ -204,7 +201,6 @@ try {
     if (!$emailCliente) out(['error'=>'El cliente no tiene un mail válido registrado'],422);
     $nombreCliente=trim((string)($cliente['nombre']??''));
 
-    // Validar que lo recibido sea realmente un PDF y no sea gigante (máx. 5 MB).
     if (strlen($pdfBase64)>7000000) out(['error'=>'El PDF es demasiado grande'],413);
     $pdfBinario=base64_decode($pdfBase64, true);
     if ($pdfBinario===false || substr($pdfBinario,0,5)!=='%PDF-') out(['error'=>'El archivo recibido no es un PDF válido'],422);
@@ -214,13 +210,9 @@ try {
     if ($nombreArchivo==='') $nombreArchivo='Orden_'.$equipoId;
     if (strtolower(substr($nombreArchivo,-4))!=='.pdf') $nombreArchivo.='.pdf';
 
-    // Freno simple contra envíos repetidos (doble clic): 30 segundos por orden.
     $marca=sys_get_temp_dir().DIRECTORY_SEPARATOR.'techaraujo_pdf_'.$equipoId.'.lock';
     if (is_file($marca) && (time()-(int)filemtime($marca))<30) out(['error'=>'Esta orden ya se envió hace instantes. Esperá unos segundos.'],429);
 
-    // Opciones para la nube (Render y similares): envío por API web (HTTPS, puerto 443).
-    // Render bloquea los puertos SMTP en el plan gratis, así que SMTP no funciona ahí.
-    // Si hay claves de Brevo o de Mailjet configuradas, se usa una de ellas en lugar de SMTP.
     $claveBrevo=configValue('BREVO_API_KEY');
     $claveMailjet=configValue('MAILJET_API_KEY');
     $secretoMailjet=configValue('MAILJET_SECRET_KEY');
@@ -321,14 +313,13 @@ try {
     out(['ok'=>true,'enviadoA'=>$emailCliente]);
   }
 
-  // Comparador de precios: busca en Google Shopping a través de SerpApi.
-  // La clave (SERPAPI_KEY) vive solo en el servidor; el navegador nunca la ve.
+ 
   if ($resource==='comparar-precios' && $method==='GET') {
     $usuarioId=(int)($_GET['usuarioId']??0);
     $consulta=trim((string)($_GET['q']??''));
     if ($consulta==='' || mb_strlen($consulta)>100) out(['error'=>'Escribí qué querés buscar (máximo 100 caracteres)'],422);
 
-    // Cada búsqueda consume cupo del plan, así que solo técnicos y administradores.
+  
     $st=$pdo->prepare('SELECT rol FROM usuario WHERE id=? LIMIT 1');
     $st->execute([$usuarioId]);
     $rolBusca=$st->fetchColumn();
@@ -337,7 +328,7 @@ try {
     $claveSerp=configValue('SERPAPI_KEY');
     if ($claveSerp==='') out(['error'=>'Falta configurar SERPAPI_KEY en el archivo .env'],503);
 
-    // Caché de 1 hora por búsqueda: repetir la misma consulta no gasta cupo.
+ 
     $archivoCache=sys_get_temp_dir().DIRECTORY_SEPARATOR.'techaraujo_shop_'.md5(mb_strtolower($consulta)).'.json';
     if (is_file($archivoCache) && (time()-(int)filemtime($archivoCache))<3600) {
       $guardado=json_decode((string)file_get_contents($archivoCache), true);
